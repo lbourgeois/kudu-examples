@@ -1,12 +1,20 @@
 package org.kududb.examples.sample;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
-import org.apache.kudu.client.*;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.kudu.client.CreateTableOptions;
+import org.apache.kudu.client.Insert;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanner;
+import org.apache.kudu.client.KuduSession;
+import org.apache.kudu.client.KuduTable;
+import org.apache.kudu.client.PartialRow;
+import org.apache.kudu.client.RowResult;
+import org.apache.kudu.client.RowResultIterator;
 
 public class Sample {
 
@@ -23,17 +31,26 @@ public class Sample {
 
     try {
       List<ColumnSchema> columns = new ArrayList(2);
-      columns.add(new ColumnSchema.ColumnSchemaBuilder("key", Type.INT32)
-          .key(true)
-          .build());
+            ColumnSchema keySchema = new ColumnSchema.ColumnSchemaBuilder("key", Type.INT32).key(true).build();
+            columns.add(keySchema);
       columns.add(new ColumnSchema.ColumnSchemaBuilder("value", Type.STRING)
           .build());
       List<String> rangeKeys = new ArrayList<>();
       rangeKeys.add("key");
 
       Schema schema = new Schema(columns);
-      client.createTable(tableName, schema,
-                         new CreateTableOptions().setRangePartitionColumns(rangeKeys));
+
+            // Unbounded range partitioning
+            // client.createTable(tableName, schema,
+            // new CreateTableOptions().setRangePartitionColumns(rangeKeys).setNumReplicas(1));
+
+            // Range partitioning
+            PartialRow lower = schema.newPartialRow();
+            lower.addInt("key", 0);
+            PartialRow upper = schema.newPartialRow();
+            upper.addInt("key", 10);
+            client.createTable(tableName, schema, new CreateTableOptions().setRangePartitionColumns(rangeKeys).setNumReplicas(1)
+                    .addRangePartition(lower, upper));
 
       KuduTable table = client.openTable(tableName);
       KuduSession session = client.newSession();
@@ -61,7 +78,7 @@ public class Sample {
       e.printStackTrace();
     } finally {
       try {
-        client.deleteTable(tableName);
+                // client.deleteTable(tableName);
       } catch (Exception e) {
         e.printStackTrace();
       } finally {
